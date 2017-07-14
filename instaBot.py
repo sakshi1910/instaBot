@@ -2,13 +2,17 @@ import requests, urllib                     # Importing Libraries..
 from termcolor import colored
 from textblob import TextBlob
 from textblob.sentiments import NaiveBayesAnalyzer
+import matplotlib.pyplot as plt
 
-APP_ACCESS_TOKEN = '5715338192.ed958cb.a30cdc9365704aa38a702754d7743083'  # Token of Mukesh Dubey....
+
+
+APP_ACCESS_TOKEN = '5715338192.ed958cb.a30cdc9365704aa38a702754d7743083'  # Token of sakshi....
 
 #Sandbox Users :
 
 BASE_URL = 'https://api.instagram.com/v1/'
 
+avg_sentiment=[0.0,0.0]
 
 #                           Function declaration to get your own info ........
 
@@ -215,6 +219,27 @@ def get_comment_list(insta_username):  # Defining the Function ............
     else:
         print colored('Status code other than 200 recieved', 'red')
 
+def get_comment_list(insta_username):  # Defining the Function ............
+    media_id = get_post_id(insta_username)  # Getting post id by passing the username .......
+    request_url = BASE_URL + 'media/%s/comments?access_token=%s' % (
+    media_id, APP_ACCESS_TOKEN)  # passing the end points and media id along with access token ..
+    print colored('GET request url : %s\n', 'blue') % (request_url)
+    comment_list = requests.get(request_url).json()
+
+    if comment_list['meta']['code'] == 200:  # checking the status code .....
+        if len(comment_list['data']):
+            position = 1
+            print colored("List of people who commented on Your Recent post", 'blue')
+            for _ in range(len(comment_list['data'])):
+                if comment_list['data'][position - 1]['text']:
+                    print colored(comment_list['data'][position - 1]['from']['username'], 'yellow') + colored(' said: ', 'yellow') + colored(comment_list['data'][position - 1]['text'],'cyan')  # Json Parsing ..printing the comments ..
+                    position = position + 1
+                else:
+                    print colored('No one had commented on Your post!\n', 'red')
+        else:
+            print colored("There is no Comments on User's Recent post.\n", 'red')
+    else:
+        print colored('Status code other than 200 recieved.\n', 'red')
 
 #                  Function declaration to make a comment on the recent post of the user................
 
@@ -236,35 +261,50 @@ def post_a_comment(insta_username):         #     Defining the function ......
 #                      Function declaration to make delete negative comments from the recent post.........................
 
 
-def delete_negative_comment(insta_username):   #     Defining the function ......
-    media_id = get_post_id(insta_username)     #   Getting media id by calling the get post id function....
+def ploating_negative_positive_comments(insta_username):   #     Defining the function ......
+    media_id = get_post_id(insta_username)
     request_url = (BASE_URL + 'media/%s/comments/?access_token=%s') % (media_id, APP_ACCESS_TOKEN)
-    print colored('GET request url : %s','blue') % (request_url)
+    print 'GET request url : %s' % (request_url)
     comment_info = requests.get(request_url).json()
+
+
+
+
+
 
     if comment_info['meta']['code'] == 200:
         if len(comment_info['data']):
-            #Here's a naive implementation of how to delete the negative comments :)
+            # Here's a naive implementation of how to delete the negative comments
             for x in range(0, len(comment_info['data'])):
                 comment_id = comment_info['data'][x]['id']
                 comment_text = comment_info['data'][x]['text']
                 blob = TextBlob(comment_text, analyzer=NaiveBayesAnalyzer())
+                print 'negative sentiment:', blob.sentiment.p_neg
+                print' positive sentiment:', blob.sentiment.p_pos
+                avg_sentiment[0]=avg_sentiment[0]+blob.sentiment.p_pos
+                avg_sentiment[1]=avg_sentiment[1]+blob.sentiment.p_neg
                 if (blob.sentiment.p_neg > blob.sentiment.p_pos):
-                    print colored('Negative comment : %s','green') % (comment_text)
-                    delete_url = (BASE_URL + 'media/%s/comments/%s/?access_token=%s') % (media_id, comment_id, APP_ACCESS_TOKEN)
-                    print colored('DELETE request url : %s','blue') % (delete_url)
+                    print 'Negative comment : %s' % (comment_text)
+                    delete_url = (BASE_URL + 'media/%s/comments/%s/?access_token=%s') % (
+                    media_id, comment_id, APP_ACCESS_TOKEN)
+                    print 'DELETE request url : %s' % (delete_url)
                     delete_info = requests.delete(delete_url).json()
 
                     if delete_info['meta']['code'] == 200:
-                        print colored('The Negative Comment From the Post has successfully deleted!\n','green')
+                        print 'Comment successfully deleted!\n'
                     else:
-                        print colored('Unable to delete comment!!','red')
+                        print 'Unable to delete comment!'
                 else:
-                    print colored('The Comment is Positive comment : %s\n','green') % (comment_text)
+                    print 'Positive comment : %s\n' % (comment_text)
+            plt.pie(avg_sentiment,colors=['green','red'])
+            print colored('negative avg','red'),avg_sentiment[1],colored('postive avg','green'),avg_sentiment[0]
+            plt.savefig("./fig.png",dpi=300)
+            plt.show()
         else:
-            print colored('There are no existing comments on the post!','red')
+            print 'There are no existing comments on the post!'
     else:
-        print colored('Status code other than 200 received!','red')
+        print 'Status code other than 200 received!'
+
 
 
 #                   Defining the Main function under which above sub-function works by calling ...........
@@ -282,7 +322,7 @@ def start_bot():
         print colored("Select Option:'F'  To Like the recent post of a user\n",'green')
         print colored("Select Option:'G'  To Get a list of comments on the recent post of a user\n",'green')
         print colored("Select Option:'H'  To Make a comment on the recent post of a user\n",'green')
-        print colored("Select Option:'I'  To Delete negative comments from the recent post of a user\n",'green')
+        print colored("Select Option:'I'  To plot negative and positive comments / Also delete negative comments\n",'green')
         print colored("Select Option:'J'  To Exit From The Application..",'red')
 
         choice = raw_input(colored("Enter you choice: ",'blue'))
@@ -310,7 +350,7 @@ def start_bot():
             post_a_comment(insta_username)
         elif choice.upper() == "I":
             insta_username = raw_input(colored("Enter the username of the user: ",'blue'))
-            delete_negative_comment(insta_username)
+            ploating_negative_positive_comments(insta_username)
         elif choice.upper() == "J":
             exit()
         else:
@@ -320,5 +360,5 @@ def start_bot():
 #                                Calling the main function ..........to start the application....
 
 
-
-start_bot()
+if __name__ == '__main__':
+    start_bot()
